@@ -1,0 +1,28 @@
+# Step 3 - Create application deployment
+
+# Now that we have a cluster running, we need to deploy our Kimai application to it.
+
+# Tangle the code blocks below to create the deployment yaml file and the shell script that will apply the deployment.
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kimai-gcp
+  labels:
+    app: kimai
+spec:
+  replicas: 1
+  selector:
+    mathlabels:
+      app: kimai
+  template:
+    metadata:
+      labels:
+        app: kimai
+  spec:
+    containers:
+      - name: mysql
+        image: mysql:latest
+        ports:
+          - containerPort: 3306

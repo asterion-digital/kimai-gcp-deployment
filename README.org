@@ -1,0 +1,151 @@
+#+TITLE: Kimai GCP Deployment
+#+AUTHOR: James Blair, Daljit Singh
+#+EMAIL: james@asterion.digital, daljit@asterion.digital
+#+DATE: 15th June 2021
+
+This org file is intended to capture and automate the end to end workflow to deploy an instance of [[https://www.kimai.org/][Kimai]] on [[https://console.cloud.google.com][Google Cloud Platform]].
+
+We'll use shell blocks inside this file which can be executed with [[https://orgmode.org/worg/org-contrib/babel/][Babel]]. Additionally we want to explore tangling these source code blocks to shell script files within this document so that the scripts can then be executed by a continous delivery pipeline.
+
+*Notes:*
+ 1. To interact with this org file we're using the [[https://github.com/humacs/humacs][Humacs]] distribution of [[https://www.gnu.org/software/emacs/][Emacs]].
+ 1. This workflow has only been tested on the ~Ubuntu 20.04~ linux distribution, via [[https://ubuntu.com/wsl][WSL 2]].
+
+
+* Step 1 - Ensure GCP SDK is installed
+
+To automate our interactions with Google Cloud Platform we'll use the [[https://cloud.google.com/sdk/docs/install#deb][GCP SDK]] which provides us with a number of command line tools to interact with the platform, such as ~gcloud~, ~gsutil~ and ~kubectl~.
+
+Tangle the shell block below to a shell script by pressing *, b t* in emacs command mode:
+
+#+NAME: Install google cloud sdk
+#+BEGIN_SRC bash :shebang #!/bin/bash :tangle 1-install-gcp-sdk.sh
+# Add the Cloud SDK distribution URI as a package source
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+
+# Make sure apt-transport-https is installed
+sudo apt-get install -y apt-transport-https ca-certificates gnupg
+
+# Import the Google Cloud public key
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+
+# Update and install the SDK
+sudo apt-get update && sudo apt-get install -y google-cloud-sdk
+#+END_SRC
+
+
+* Step 2 - Configure cloud resources
+
+With GCP SDK now installed we need to authenticate, create a project and then create an [[https://cloud.google.com/blog/products/containers-kubernetes/introducing-gke-autopilot][AutoPilot]] kubernetes cluster that we will install Kimai into later in the workflow.
+
+First up is authentication so our GCP SDK installation can carry out actions in a given account and project. This part of the process is currently a manual step as the authentication process includes some interactive steps.
+
+In future we could automate this process as part of a continous delivery pipeline using a GCP service account with permission to create virtual machine instances.
+
+#+NAME: Authenticate with google cloud platform
+#+BEGIN_SRC bash :shebang #!/bin/bash :tangle no
+gcloud auth login
+#+END_SRC
+
+
+Once we have authenticated we can create a project and then create a new kubernetes cluster within that project.
+
+Firstly let's create a new project, a project is the logical boundary all our cloud resources for this deployment will live within. To be able to deploy resources we also need to enable billing.
+
+Tangle the shell block below to a shell script by pressing *, b t* in emacs command mode:
+
+#+NAME: Create a new google cloud project
+#+begin_src bash :shebang #!/bin/bash :tangle 2-configure-gcp-project.sh
+# Create a project id based on date
+export gcp_project_id="kimai-gcp"
+
+# Create new project using a random project id
+gcloud projects create $gcp_project_id
+
+# Ensure billing is enabled for the project
+export gcp_billing_account=$(gcloud alpha billing accounts list --limit=1 --format='value(name.basename())')
+gcloud alpha billing projects link $gcp_project_id --billing-account $gcp_billing_account
+
+# Make sure the project is set active
+gcloud config set project $gcp_project_id
+#+end_src
+
+
+Once we have a project we can create a new cluster. To create a cluster we need to ensure compute engine apis are enabled.
+
+Tangle the shell block below to a shell script by pressing *, b t* in emacs command mode:
+
+#+begin_src bash :shebang #!/bin/bash :tangle 3-create-autopilot-cluster
+  # Ensure compute engine apis are enabled in the project
+  gcloud services enable container.googleapis.com
+
+  # Create the new machine
+  gcloud container clusters create-auto kimai-gcp --region australia-southeast1
+#+end_src
+
+
+* Step 3 - Create application deployment
+
+Now that we have a cluster running, we need to deploy our Kimai application to it.
+
+Tangle the code blocks below to create the deployment yaml file and the shell script that will apply the deployment.
+
+#+begin_src yaml :tangle 4-application-deployment.yaml
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: kimai-gcp
+    labels:
+      app: kimai
+  spec:
+    replicas: 1
+    selector:
+      mathlabels:
+        app: kimai
+    template:
+      metadata:
+        labels:
+          app: kimai
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:latest
+          ports:
+            - containerPort: 3306
+#+end_src
+
+
+#+begin_src bash :shebang #!/bin/bash :tangle 4-create-application-deployment.sh
+  # Retrieve credentials for the cluster
+  gcloud container clusters get-credentials kimai-gcp --region australia-southeast1
+
+  # Apply the application deployment yaml
+  kubectl apply -f 4-application-deployment.yaml
+#+end_src
+
+
+* Step 5 - Teardown cloud resources
+
+The Google Cloud Platform resources created by this process come at a cost, so it's important we have an easy way to teardown those resources as soon as we're finished with them!
+
+The script below will delete any projects containing ~gitlab~ in the name along with any compute instances running in those projects.
+
+Tangle the shell block below to a shell script by pressing *, b t* in emacs command mode:
+
+#+begin_src bash :shebang #!/bin/bash
+# Iterate over any matching projects
+for project in $(gcloud projects list | awk '{ print $1 }' | grep kimai); do
+
+  # Iterate over any instances in the project
+  for instance in $(gcloud compute instances list --project $project --format="value(name)"); do
+
+    # Delete the instance
+    gcloud compute instances delete --quiet $instance --zone australia-southeast1-a --project $project
+
+  done
+
+  # Delete the project as well
+  gcloud projects delete $project --quiet
+
+done
+#+end_src
