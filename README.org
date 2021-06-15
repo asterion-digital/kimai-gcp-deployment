@@ -90,22 +90,23 @@ Now that we have a cluster running, we need to deploy our Kimai application to i
 
 Tangle the code blocks below to create the deployment yaml file and the shell script that will apply the deployment.
 
-#+begin_src yaml :tangle 4-application-deployment.yaml
+#+begin_src yaml :tangle 4-db-deployment.yaml
+  ---
   apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: kimai-gcp
+    name: kimai-db
     labels:
-      app: kimai
+      app: kimai-db
   spec:
     replicas: 1
     selector:
       matchLabels:
-        app: kimai
+        app: kimai-db
     template:
       metadata:
         labels:
-          app: kimai
+          app: kimai-db
       spec:
         containers:
           - name: mysql
@@ -115,10 +116,10 @@ Tangle the code blocks below to create the deployment yaml file and the shell sc
             resources:
               limits:
                 cpu: "500m"
-                memory: "500Mi"
+                memory: "1Gi"
               requests:
                 cpu: "250m"
-                memory: "256Mi"
+                memory: "512Mi"
             env:
               - name: MYSQL_DATABASE
                 value: kimai
@@ -128,19 +129,71 @@ Tangle the code blocks below to create the deployment yaml file and the shell sc
                 value: kimai
               - name: MYSQL_ROOT_PASSWORD
                 value: kimai
+#+end_src
 
+#+begin_src yaml :tangle 4-app-deployment.yaml
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: kimai-app
+    labels:
+      app: kimai-app
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: kimai-app
+    template:
+      metadata:
+        labels:
+          app: kimai-app
+      spec:
+       containers:
+          - name: kimai
+            image: kimai/kimai2
+            ports:
+              - containerPort: 8001
+            resources:
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+              requests:
+                cpu: "250m"
+                memory: "256Mi"
+            env:
+              - name: DATABASE_URL
+                value: mysql://kimai:kimai@mysql:3306/kimai
+#+end_src
+
+#+begin_src yaml :tangle 4-db-service.yaml
+  ---
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: kimai-db
+    labels:
+      app: kimai-db
+  spec :
+    ports :
+      - name : "mysql"
+        protocol : "TCP"
+        port : 3306
+        targetPort : 3306
 #+end_src
 
 
 #+begin_src bash :shebang #!/bin/bash :tangle 4-create-application-deployment.sh
-# Define where kubeconfig file will be stored
-export KUBECONFIG=/home/$USER/.kube/config
+  # Define where kubeconfig file will be stored
+  export KUBECONFIG=/home/$USER/.kube/config
 
-# Retrieve credentials for the cluster
-gcloud container clusters get-credentials kimai-gcp --region australia-southeast1
+  # Retrieve credentials for the cluster
+  gcloud container clusters get-credentials kimai-gcp --region australia-southeast1
 
-# Apply the application deployment yaml
-kubectl apply -f 4-application-deployment.yaml
+  # Apply the application deployment yaml
+  kubectl apply -f 4-app-deployment.yaml
+  kubectl apply -f 4-db-deployment.yaml
+  kubectl apply -f 4-db-service.yaml
 #+end_src
 
 

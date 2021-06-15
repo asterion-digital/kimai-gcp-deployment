@@ -5,21 +5,22 @@
 # Tangle the code blocks below to create the deployment yaml file and the shell script that will apply the deployment.
 
 
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kimai-gcp
+  name: kimai-db
   labels:
-    app: kimai
+    app: kimai-db
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kimai
+      app: kimai-db
   template:
     metadata:
       labels:
-        app: kimai
+        app: kimai-db
     spec:
       containers:
         - name: mysql
@@ -29,10 +30,10 @@ spec:
           resources:
             limits:
               cpu: "500m"
-              memory: "500Mi"
+              memory: "1Gi"
             requests:
               cpu: "250m"
-              memory: "256Mi"
+              memory: "512Mi"
           env:
             - name: MYSQL_DATABASE
               value: kimai
