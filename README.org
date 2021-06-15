@@ -30,7 +30,7 @@ sudo apt-get install -y apt-transport-https ca-certificates gnupg
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
 
 # Update and install the SDK
-sudo apt-get update && sudo apt-get install -y google-cloud-sdk
+sudo apt-get update && sudo apt-get install -y google-cloud-sdk kubectl
 #+END_SRC
 
 
@@ -75,12 +75,12 @@ Once we have a project we can create a new cluster. To create a cluster we need 
 
 Tangle the shell block below to a shell script by pressing *, b t* in emacs command mode:
 
-#+begin_src bash :shebang #!/bin/bash :tangle 3-create-autopilot-cluster
-  # Ensure compute engine apis are enabled in the project
-  gcloud services enable container.googleapis.com
+#+begin_src bash :shebang #!/bin/bash :tangle 3-create-autopilot-cluster.sh
+# Ensure compute engine apis are enabled in the project
+gcloud services enable container.googleapis.com
 
-  # Create the new machine
-  gcloud container clusters create-auto kimai-gcp --region australia-southeast1
+# Create the new machine
+gcloud container clusters create-auto kimai-gcp --region australia-southeast1
 #+end_src
 
 
@@ -100,27 +100,47 @@ Tangle the code blocks below to create the deployment yaml file and the shell sc
   spec:
     replicas: 1
     selector:
-      mathlabels:
+      matchLabels:
         app: kimai
     template:
       metadata:
         labels:
           app: kimai
-    spec:
-      containers:
-        - name: mysql
-          image: mysql:latest
-          ports:
-            - containerPort: 3306
+      spec:
+        containers:
+          - name: mysql
+            image: mysql:latest
+            ports:
+              - containerPort: 3306
+            resources:
+              limits:
+                cpu: "500m"
+                memory: "500Mi"
+              requests:
+                cpu: "250m"
+                memory: "256Mi"
+            env:
+              - name: MYSQL_DATABASE
+                value: kimai
+              - name: MYSQL_USER
+                value: kimai
+              - name: MYSQL_PASSWORD
+                value: kimai
+              - name: MYSQL_ROOT_PASSWORD
+                value: kimai
+
 #+end_src
 
 
 #+begin_src bash :shebang #!/bin/bash :tangle 4-create-application-deployment.sh
-  # Retrieve credentials for the cluster
-  gcloud container clusters get-credentials kimai-gcp --region australia-southeast1
+# Define where kubeconfig file will be stored
+export KUBECONFIG=/home/$USER/.kube/config
 
-  # Apply the application deployment yaml
-  kubectl apply -f 4-application-deployment.yaml
+# Retrieve credentials for the cluster
+gcloud container clusters get-credentials kimai-gcp --region australia-southeast1
+
+# Apply the application deployment yaml
+kubectl apply -f 4-application-deployment.yaml
 #+end_src
 
 

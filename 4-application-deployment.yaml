@@ -14,15 +14,31 @@ metadata:
 spec:
   replicas: 1
   selector:
-    mathlabels:
+    matchLabels:
       app: kimai
   template:
     metadata:
       labels:
         app: kimai
-  spec:
-    containers:
-      - name: mysql
-        image: mysql:latest
-        ports:
-          - containerPort: 3306
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:latest
+          ports:
+            - containerPort: 3306
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "500Mi"
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+          env:
+            - name: MYSQL_DATABASE
+              value: kimai
+            - name: MYSQL_USER
+              value: kimai
+            - name: MYSQL_PASSWORD
+              value: kimai
+            - name: MYSQL_ROOT_PASSWORD
+              value: kimai
