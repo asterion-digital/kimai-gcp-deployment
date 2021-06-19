@@ -4,7 +4,7 @@
 #+DATE: 15th June 2021
 
 #+NAME:   fig:CloudShellButton
-[[./images/open-btn.png]]
+[[./images/open-btn.png][https://console.cloud.google.com/cloudshell/open?git_repo=https://github.com/jmhbnz/kimai-gcp-deployment]]
 
 This org file is intended to capture and automate the end to end workflow to deploy an instance of [[https://www.kimai.org/][Kimai]] on [[https://console.cloud.google.com][Google Cloud Platform]].
 
