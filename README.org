@@ -3,6 +3,9 @@
 #+EMAIL: james@asterion.digital, daljit@asterion.digital
 #+DATE: 15th June 2021
 
+#+NAME:   fig:CloudShellButton
+[[./images/open-btn.png]]
+
 This org file is intended to capture and automate the end to end workflow to deploy an instance of [[https://www.kimai.org/][Kimai]] on [[https://console.cloud.google.com][Google Cloud Platform]].
 
 We'll use shell blocks inside this file which can be executed with [[https://orgmode.org/worg/org-contrib/babel/][Babel]]. Additionally we want to explore tangling these source code blocks to shell script files within this document so that the scripts can then be executed by a continous delivery pipeline.
