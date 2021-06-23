@@ -6,6 +6,8 @@ metadata:
   labels:
     app: kimai-db
 spec :
+  selector:
+    app: kimai-db
   ports :
     - name : "mysql"
       protocol : "TCP"

@@ -9,3 +9,4 @@ gcloud container clusters get-credentials kimai-gcp --region australia-southeast
 kubectl apply -f 4-app-deployment.yaml
 kubectl apply -f 4-db-deployment.yaml
 kubectl apply -f 4-db-service.yaml
+kubectl apply -f 4-app-service.yaml

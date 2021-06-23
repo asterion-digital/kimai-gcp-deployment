@@ -17,7 +17,7 @@ spec:
     spec:
      containers:
         - name: kimai
-          image: kimai/kimai2
+          image: kimai/kimai2:apache
           ports:
             - containerPort: 8001
           resources:
@@ -29,4 +29,6 @@ spec:
               memory: "256Mi"
           env:
             - name: DATABASE_URL
-              value: mysql://kimai:kimai@mysql:3306/kimai
+              value: mysql://kimai:kimai@10.14.3.114:3306/kimai
+            - name: TRUSTED_HOSTS
+              value: 127.0.0.1,localhost,kimai.asterion.digital
