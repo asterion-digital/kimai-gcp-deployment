@@ -8,11 +8,12 @@
 
 This org file is intended to capture and automate the end to end workflow to deploy an instance of [[https://www.kimai.org/][Kimai]] on [[https://console.cloud.google.com][Google Cloud Platform]].
 
-We'll use shell blocks inside this file which can be executed with [[https://orgmode.org/worg/org-contrib/babel/][Babel]]. Additionally we want to explore tangling these source code blocks to shell script files within this document so that the scripts can then be executed by a continous delivery pipeline.
+We'll use shell blocks inside this file which can be executed with [[https://orgmode.org/worg/org-contrib/babel/][Babel]] or tangled out to files within this repository so that the scripts can then be executed manually or by a continous delivery pipeline.
 
 *Notes:*
  1. To interact with this org file we're using the [[https://github.com/humacs/humacs][Humacs]] distribution of [[https://www.gnu.org/software/emacs/][Emacs]].
  1. This workflow has only been tested on the ~Ubuntu 20.04~ linux distribution, via [[https://ubuntu.com/wsl][WSL 2]].
+ 1. To run manually you can just click the "Open In Google Cloud Shell" button above.
 
 
 * Step 1 - Ensure GCP SDK is installed
@@ -37,7 +38,7 @@ sudo apt-get update && sudo apt-get install -y google-cloud-sdk kubectl
 #+END_SRC
 
 
-* Step 2 - Configure cloud resources
+* Step 2 - Create Google Cloud project
 
 With GCP SDK now installed we need to authenticate, create a project and then create an [[https://cloud.google.com/blog/products/containers-kubernetes/introducing-gke-autopilot][AutoPilot]] kubernetes cluster that we will install Kimai into later in the workflow.
 
@@ -74,6 +75,8 @@ gcloud config set project $gcp_project_id
 #+end_src
 
 
+* Step 3 - Create kubernetes cluster
+
 Once we have a project we can create a new cluster. To create a cluster we need to ensure compute engine apis are enabled.
 
 Tangle the shell block below to a shell script by pressing *, b t* in emacs command mode:
@@ -87,116 +90,151 @@ gcloud container clusters create-auto kimai-gcp --region australia-southeast1
 #+end_src
 
 
-* Step 3 - Create application deployment
+* Step 4 - Create application deployment
 
-Now that we have a cluster running, we need to deploy our Kimai application to it.
+Now that we have a cluster running, we need to deploy our Kimai database and application to it.
 
-Tangle the code blocks below to create the deployment yaml file and the shell script that will apply the deployment.
+Tangle the code blocks below to create the kubernetes resource yaml files and the shell script that will apply the scripts within our cluster.
 
-#+begin_src yaml :tangle 4-db-deployment.yaml
-  ---
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: kimai-db
-    labels:
+The first file is the database deployment, which will create a [[https://en.wikipedia.org/wiki/MySQL][MySQL]] database pod. Adjust the credentials to suit your environment.
+
+#+begin_src yaml :tangle config/db-deployment.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kimai-db
+  labels:
+    app: kimai-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
       app: kimai-db
-  spec:
-    replicas: 1
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: kimai-db
-    template:
-      metadata:
-        labels:
-          app: kimai-db
-      spec:
-        containers:
-          - name: mysql
-            image: mysql:latest
-            ports:
-              - containerPort: 3306
-            resources:
-              limits:
-                cpu: "500m"
-                memory: "1Gi"
-              requests:
-                cpu: "250m"
-                memory: "512Mi"
-            env:
-              - name: MYSQL_DATABASE
-                value: kimai
-              - name: MYSQL_USER
-                value: kimai
-              - name: MYSQL_PASSWORD
-                value: kimai
-              - name: MYSQL_ROOT_PASSWORD
-                value: kimai
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:latest
+          ports:
+            - containerPort: 3306
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+          env:
+            - name: MYSQL_DATABASE
+              value: kimai
+            - name: MYSQL_USER
+              value: kimai
+            - name: MYSQL_PASSWORD
+              value: kimai
+            - name: MYSQL_ROOT_PASSWORD
+              value: kimai
 #+end_src
 
-#+begin_src yaml :tangle 4-app-deployment.yaml
-  ---
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: kimai-app
-    labels:
+The second file creates the application deployment, which will create a second pod in the cluster running the custom Kimai application.
+
+Remember to adjust the ~TRUSTED_HOSTS~ environment variable to suit your needs.
+
+#+begin_src yaml :tangle config/app-deployment.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kimai-app
+  labels:
+    app: kimai-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
       app: kimai-app
-  spec:
-    replicas: 1
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: kimai-app
-    template:
-      metadata:
-        labels:
-          app: kimai-app
-      spec:
-       containers:
-          - name: kimai
-            image: kimai/kimai2
-            ports:
-              - containerPort: 8001
-            resources:
-              limits:
-                cpu: "500m"
-                memory: "512Mi"
-              requests:
-                cpu: "250m"
-                memory: "256Mi"
-            env:
-              - name: DATABASE_URL
-                value: mysql://kimai:kimai@mysql:3306/kimai
+    spec:
+     containers:
+        - name: kimai
+          image: kimai/kimai2:apache
+          ports:
+            - containerPort: 8001
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+          env:
+            - name: DATABASE_URL
+              value: mysql://kimai:kimai@kimai-db:3306/kimai
+            - name: TRUSTED_HOSTS
+              value: 127.0.0.1,localhost,kimai.asterion.digital
 #+end_src
 
-#+begin_src yaml :tangle 4-db-service.yaml
-  ---
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: kimai-db
-    labels:
-      app: kimai-db
-  spec :
-    ports :
-      - name : "mysql"
-        protocol : "TCP"
-        port : 3306
-        targetPort : 3306
+The third kubernetes resource file creates the kubernetes service that will allow our Kimai application pod to talk to our MySQL database.
+
+#+begin_src yaml :tangle config/db-service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kimai-db
+  labels:
+    app: kimai-db
+spec :
+  selector:
+    app: kimai-db
+  ports :
+    - name : "mysql"
+      protocol : "TCP"
+      port : 3306
+      targetPort : 3306
 #+end_src
 
+The final file creates the kubernetes loadbalancer service that we will use to access our application externally over the internet.
+
+#+begin_src yaml :tangle config/app-service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kimai-app
+  labels:
+    app: kimai-app
+spec:
+  selector:
+    app: kimai-app
+  ports:
+    - name: "kimai"
+      protocol: "TCP"
+      port: 8001
+      targetPort: 8001
+  type: LoadBalancer
+#+end_src
+
+The final file we will tangle is the shell script that will retrieve the credentials for our kubernetes cluster then apply our resources.
 
 #+begin_src bash :shebang #!/bin/bash :tangle 4-create-application-deployment.sh
-  # Define where kubeconfig file will be stored
-  export KUBECONFIG=/home/$USER/.kube/config
+# Define where kubeconfig file will be stored
+export KUBECONFIG=/home/$USER/.kube/config
 
-  # Retrieve credentials for the cluster
-  gcloud container clusters get-credentials kimai-gcp --region australia-southeast1
+# Retrieve credentials for the cluster
+gcloud container clusters get-credentials kimai-gcp --region australia-southeast1
 
-  # Apply the application deployment yaml
-  kubectl apply -f 4-app-deployment.yaml
-  kubectl apply -f 4-db-deployment.yaml
-  kubectl apply -f 4-db-service.yaml
+# Apply the application deployment yaml
+kubectl apply -f config/app-deployment.yaml
+kubectl apply -f config/db-deployment.yaml
+kubectl apply -f config/db-service.yaml
+kubectl apply -f config/app-service.yaml
 #+end_src
 
 
@@ -204,24 +242,24 @@ Tangle the code blocks below to create the deployment yaml file and the shell sc
 
 The Google Cloud Platform resources created by this process come at a cost, so it's important we have an easy way to teardown those resources as soon as we're finished with them!
 
-The script below will delete any projects containing ~gitlab~ in the name along with any compute instances running in those projects.
+The script below will delete any projects containing ~kimai~ in the name along with any compute kubernetes clusters running in those projects.
 
 Tangle the shell block below to a shell script by pressing *, b t* in emacs command mode:
 
-#+begin_src bash :shebang #!/bin/bash
+#+begin_src bash :shebang #!/bin/bash :tangle 5-teardown-resources.sh
 # Iterate over any matching projects
 for project in $(gcloud projects list | awk '{ print $1 }' | grep kimai); do
 
   # Iterate over any instances in the project
-  for instance in $(gcloud compute instances list --project $project --format="value(name)"); do
+  for instance in $(gcloud container clusters list --project $project --format="value(name)"); do
 
-    # Delete the instance
-    gcloud compute instances delete --quiet $instance --zone australia-southeast1-a --project $project
+    # Delete the cluster
+    gcloud container clusters delete --quiet $instance --zone australia-southeast1 --project $project
 
   done
 
   # Delete the project as well
-  gcloud projects delete $project --quiet
+  #gcloud projects delete $project --quiet
 
 done
 #+end_src

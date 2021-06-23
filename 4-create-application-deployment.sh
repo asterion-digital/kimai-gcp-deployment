@@ -1,4 +1,9 @@
 #!/bin/bash
+
+
+# The final file we will tangle is the shell script that will retrieve the credentials for our kubernetes cluster then apply our resources.
+
+
 # Define where kubeconfig file will be stored
 export KUBECONFIG=/home/$USER/.kube/config
 

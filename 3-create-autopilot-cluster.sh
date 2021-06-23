@@ -1,6 +1,5 @@
 #!/bin/bash
-
-
+# Step 3 - Create kubernetes cluster
 
 # Once we have a project we can create a new cluster. To create a cluster we need to ensure compute engine apis are enabled.
 

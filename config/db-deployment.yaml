@@ -1,8 +1,10 @@
-# Step 3 - Create application deployment
+# Step 4 - Create application deployment
 
-# Now that we have a cluster running, we need to deploy our Kimai application to it.
+# Now that we have a cluster running, we need to deploy our Kimai database and application to it.
 
-# Tangle the code blocks below to create the deployment yaml file and the shell script that will apply the deployment.
+# Tangle the code blocks below to create the kubernetes resource yaml files and the shell script that will apply the scripts within our cluster.
+
+# The first file is the database deployment, which will create a [[https://en.wikipedia.org/wiki/MySQL][MySQL]] database pod. Adjust the credentials to suit your environment.
 
 
 ---

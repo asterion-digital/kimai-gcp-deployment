@@ -1,3 +1,10 @@
+
+
+# The second file creates the application deployment, which will create a second pod in the cluster running the custom Kimai application.
+
+# Remember to adjust the ~TRUSTED_HOSTS~ environment variable to suit your needs.
+
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,6 +36,6 @@ spec:
               memory: "256Mi"
           env:
             - name: DATABASE_URL
-              value: mysql://kimai:kimai@10.14.3.114:3306/kimai
+              value: mysql://kimai:kimai@kimai-db:3306/kimai
             - name: TRUSTED_HOSTS
               value: 127.0.0.1,localhost,kimai.asterion.digital

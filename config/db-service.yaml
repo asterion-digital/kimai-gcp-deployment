@@ -1,3 +1,8 @@
+
+
+# The third kubernetes resource file creates the kubernetes service that will allow our Kimai application pod to talk to our MySQL database.
+
+
 ---
 apiVersion: v1
 kind: Service
