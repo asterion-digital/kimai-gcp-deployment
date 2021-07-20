@@ -235,6 +235,11 @@ kubectl apply -f config/app-deployment.yaml
 kubectl apply -f config/db-deployment.yaml
 kubectl apply -f config/db-service.yaml
 kubectl apply -f config/app-service.yaml
+
+
+# Create the admin account to login to Kimai
+ podname=$(kubectl get pods -o=name | grep kimai-app | sed "s/^.\{4\}//")
+ kubectl exec -ti $podname /opt/kimai/bin/console kimai:create-user admin admin@example.com ROLE_SUPER_ADMIN
 #+end_src
 
 
